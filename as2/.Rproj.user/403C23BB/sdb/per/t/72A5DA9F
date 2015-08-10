@@ -1,0 +1,18 @@
+{
+    "contents" : "---\ntitle: \"Preliminary Data Analysis of Severe Weather Events in the USA\"\nauthor: \"qpxu007\"\ndate: \"August 6, 2015\"\noutput: html_document\n---\n\n\n## Synopsis\n\n1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?\n\n2. Across the United States, which types of events have the greatest economic consequences?\n\n## Data Processing\n\n```{r}\ndf<-read.csv(\"repdata-data-StormData.csv\")\ns<-c(\"EVTYPE\",\"FATALITIES\",\"INJURIES\",\"PROPDMG\",\"CROPDMG\")\ndf2 <- df[s]\ndf2$health <- df2$INJURIES+df2$FATALITIES\ndf2$damage <- df2$PROPDMG+df2$CROPDMG\n```\n\n## Results\n\n```{r}\ndf3 <- aggregate(df2[c('health','damage')],by=list(df2$EVTYPE), FUN=sum )\n```\n",
+    "created" : 1438879647253.000,
+    "dirty" : false,
+    "encoding" : "ISO8859-1",
+    "folds" : "",
+    "hash" : "2190545523",
+    "id" : "72A5DA9F",
+    "lastKnownWriteTime" : 1438883711,
+    "path" : "E:/R-classes/RepData/as2/RepData-as2.Rmd",
+    "project_path" : "RepData-as2.Rmd",
+    "properties" : {
+        "tempName" : "Untitled1"
+    },
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "type" : "r_markdown"
+}
