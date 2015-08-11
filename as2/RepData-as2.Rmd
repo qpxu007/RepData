@@ -4,26 +4,229 @@ author: "qpxu007"
 date: "August 6, 2015"
 output: html_document
 ---
-
+```{r echo=FALSE}
+library(knitr)
+```
 
 ## Synopsis
 
-1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+In the following excercise, we analyze the severe weather events collected by NOAA to answer two questions: 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? 2. Across the United States, which types of events have the greatest economic consequences?
 
-2. Across the United States, which types of events have the greatest economic consequences?
+## Introduction
+
+The severe weather event data collected by NOAA contains 902297 obs. of 37 variables. The "EVTYPE" column contains type of events. The health related columns "FATALITIES" and "INJURIES". The economic damage related columns are property damage ("PROPDMG" and "PROPDMGEXP") and crop damage("CROPDMG" and "CROPDMGEXP").
 
 ## Data Processing
 
-```{r}
+Firt, we read the data into a data frame (df):
+
+```{r cache=TRUE}
 df<-read.csv("repdata-data-StormData.csv")
-s<-c("EVTYPE","FATALITIES","INJURIES","PROPDMG","CROPDMG")
+str(df)
+```
+
+To answer the questions raised above, we need to extract the following columns: "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", and "CROPDMGEXP". For the damages, it should be noted that, the numbers in CROPDMG/PROPDMG columns are given in different units (kilo, mil, billion), which are set in the corresponding CROPDMGEXP/PROPDMGEXP columns. As a result, we need to do some cleaning up and conversion. So we subset part of the data into df2:
+
+```{r}
+s<-c("EVTYPE","FATALITIES","INJURIES",
+     "PROPDMG","PROPDMGEXP", "CROPDMG", "CROPDMGEXP")
 df2 <- df[s]
+```
+
+For the damages, it should be noted that, the numbers in CROPDMG/PROPDMG columns are given in different units (kilo, mil, billion), which are stored in the corresponding CROPDMGEXP/PROPDMGEXP columns respectively. Below we convert all damages into the same unit (Millions, we only deal with H, K, M, and B, the rest are assumed to be 0 since they are small in comparison):
+
+```{r}
+trans <-function(unit) {
+  unit = toupper(unit)
+  nfactor = 0.0
+  if (unit == "K") {
+    nfactor <- 0.001
+  } else if (unit == "H") {
+    nfactor <- 0.0001
+  } else if (unit == "M") {
+    nfactor <- 1.0
+  } else if (unit == "B") {
+    nfactor <- 1000.0
+  }
+  nfactor
+}
+
+df2$PROPDMGEXP<-sapply(df2$PROPDMGEXP, trans)
+df2$PROPDMG<- df2$PROPDMG * df2$PROPDMGEXP
+
+df2$CROPDMGEXP<-sapply(df2$CROPDMGEXP, trans)
+df2$CROPDMG <- df2$CROPDMG * df2$CROPDMGEXP
+```
+
+We now can add two new columns: "health" to combine injuries and fatalities, and "damage" to combine crop and property damages. We can also clean up df2 a bit by removing the unit columns ("PROPDMGEXP","CROPDMGEXP") that are no longer needed.
+
+```{r}
 df2$health <- df2$INJURIES+df2$FATALITIES
 df2$damage <- df2$PROPDMG+df2$CROPDMG
+df2$PROPDMGEXP<- df2$CROPDMGEXP  <- NULL
+str(df2)
 ```
 
 ## Results
 
+To answer questions above, we first need to aggregate the df2 with *sum* by EVTYPE, to generate a new data frame df3. 
+
 ```{r}
-df3 <- aggregate(df2[c('health','damage')],by=list(df2$EVTYPE), FUN=sum )
+df3 <- aggregate(df2[c("health","damage", "INJURIES",
+                       "FATALITIES", "CROPDMG", "PROPDMG")],
+                       by=list(EVTYPE=df2$EVTYPE), FUN=sum)
+summary(df3)
+```
+
+The data frame df3 contains necessary information to answer the questions above. In the following, we create a function that process the data frame based on two columns (EVTYPE, and a consequence): first sort the data frame in decreasing order of the consequence; and then plot the top n EVTYPE (x) against consequence (y, in log scale and decreasing order).
+
+
+```{r}
+myplot<-function(df, xcol="EVTYPE", ycol="health", n=5, 
+                ylabel="Injuries and Fatalities", 
+                color="red", offset=1.5) {
+   # sorted the df according the relevant ycol
+   df <- df[order(-df[,ycol]), ]
+   # select relevant columns and plot
+   y <- df[1:n,ycol]
+   x <- df[1:n,xcol]
+   seqx <- seq(x)
+
+   plot(seqx, log(y), type='b', xaxt='n', 
+        ylab=paste("log(",ylabel,")"), xlab="", col=color)
+   axis(1,at=seqx, labels=F)
+   text(seqx, par("usr")[3] - 0.2, labels = x, srt = 25, pos = 1, 
+        xpd = TRUE, offset=offset, cex=1)
+}
+```
+
+Now, we can prepare a composite plots of EVTYPE vs various damages: 
+
+```{r}
+par(mfrow=c(2,3))
+myplot(df3,ycol='health', ylabel="Injuries and Fatalities")
+myplot(df3,ycol='FATALITIES', ylabel="Fatalities")
+myplot(df3,ycol='INJURIES', ylabel="Injuries")
+
+myplot(df3,ycol='damage', ylabel="Property and Crop Damages (Mil)", color='blue')
+myplot(df3,ycol='PROPDMG', ylabel="Property Damages (Mil)", color='blue')
+myplot(df3,ycol='CROPDMG', ylabel="Crop Damages (Mil)", color='blue')
+```
+
+Based on the plot above, it can be observed that tornados cause most fatalities and injuries, while floods cause most economical damages (property and crop combined, and property alone). Drougt is the leading cause of crop damage.
+
+
+##Discussion
+
+Below we will explore mapping of the damage data to the maps. We can prep data similar to above analysis, and retain the location and date columns.
+
+```{r}
+s<-c("EVTYPE","FATALITIES","INJURIES",
+     "PROPDMG","PROPDMGEXP", "CROPDMG", "CROPDMGEXP", 
+     "STATE", "BGN_DATE", "LATITUDE", "LONGITUDE")
+dfx <- df[s]
+
+# fix date
+dfx$BGN_DATE<-as.Date(as.character(dfx$BGN_DATE), 
+                      format="%m/%d/%Y %H:%M:%S")
+# convert the lattitude and longitude data (assuming there are digital degrees)
+dfx$LATITUDE<-dfx$LATITUDE*0.01
+dfx$LONGITUDE<-dfx$LONGITUDE*0.01
+
+dfx$PROPDMGEXP<-sapply(dfx$PROPDMGEXP,trans)
+dfx$PROPDMG<- dfx$PROPDMG * dfx$PROPDMGEXP
+
+dfx$CROPDMGEXP<-sapply(dfx$CROPDMGEXP,trans)
+dfx$CROPDMG <- dfx$CROPDMG * dfx$CROPDMGEXP
+
+dfx$health <- dfx$INJURIES+dfx$FATALITIES
+dfx$damage <- dfx$PROPDMG+dfx$CROPDMG
+dfx$PROPDMGEXP<- dfx$CROPDMGEXP  <- NULL
+
+states<-cbind(tolower(state.name),state.abb)
+colnames(states)<-c('region','STATE')
+dfx<-merge(dfx, states, by=c("STATE"))
+summary(dfx)
+```
+
+We can show the geospatial distribution of the human and economic costs of all the events for all time recorded.
+
+```{r}
+df4<- aggregate(dfx[c("health","damage", "INJURIES",
+                      "FATALITIES", "CROPDMG", "PROPDMG")],
+                       by=list(region=dfx$region, STATE=dfx$STATE), FUN=sum)
+```
+
+We can use ggplot2 for this. The following charts divide the severity of the damage into five levels, and color them accordingly.
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+library(gridExtra)
+
+states_map <- map_data("state")
+
+#prepare state labels
+cnames <-aggregate(cbind(long, lat) ~ region, data = states_map, 
+                     FUN = function(x) mean(range(x)))
+states_full_abbrev <-cbind(tolower(state.name),state.abb)
+colnames(states_full_abbrev)<-c('region','STATE')
+cnames <-merge(cnames, states_full_abbrev, by=c('region'))
+#tweak label positions 
+cnames[10, c(2:3)] <- c(-114.5, 43.5) # move label for idaho 
+cnames[16, 3] <- 30.6 #LA
+cnames[20, c(2:3)] <- c(-84.5, 43) # MI
+cnames[8, c(2:3)] <- c(-81.5, 28) # FL
+
+title="Cumulative Injuries and Fatalities by State 1950-2011"
+g1<-ggplot(df4, aes(map_id = region)) +
+    geom_map(aes(fill = cut_number(health,5)), map = states_map, color ="white") +
+    expand_limits(x = states_map$long, y = states_map$lat) +
+    ggtitle(title) + theme_bw()+
+    theme(plot.title = element_text(size=20, face="bold", vjust=2),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          legend.position = "bottom",
+          legend.title=element_blank(),
+          axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text =  element_blank()) +
+  geom_text(data=cnames, aes(long, lat, label = STATE, map_id =NULL), size=3.5) +
+  coord_map()
+g1
+
+title="Cumulative Property and Crop Damage by State \n1950-2011"
+g2<-ggplot(df4, aes(map_id = region)) +
+    geom_map(aes(fill = cut_number(damage,5)), map = states_map, color ="white") +
+    expand_limits(x = states_map$long, y = states_map$lat) +
+    ggtitle(title) + theme_bw()+
+    theme(plot.title = element_text(size=20, face="bold", vjust=2),
+          panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+          legend.position = "bottom",
+          legend.title=element_blank(),
+          axis.ticks = element_blank(), 
+          axis.title = element_blank(), 
+          axis.text =  element_blank()) +
+  geom_text(data=cnames, aes(long, lat, label = STATE, map_id =NULL), size=3.5) +
+  coord_map()
+g2
+```
+
+
+```{r echo=F}
+#grid.arrange(g1, g2, ncol = 2)
+# require(lubridate)
+# df4<- aggregate(dfx[c("health","damage", "INJURIES",
+#                       "FATALITIES", "CROPDMG", "PROPDMG")],
+#                        by=list(region=dfx$region, STATE=dfx$STATE, 
+#                        Year=year(dfx$BGN_DATE)), FUN=sum)
+
+# library(choroplethr)
+# library(choroplethrMaps)
+# df4$value<-df4$health
+# state_choropleth(df4, legend="Injuries or Fatalities",
+#                  title="Cumulative Injuries and Fatalities 1950-2011")
+
+
+#require(rMaps)
+#ichoropleth(health~STATE, data=df4, animate = "Year", map='usa')
 ```
