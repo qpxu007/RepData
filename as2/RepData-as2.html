@@ -69,7 +69,7 @@ img {
 
 <div id="synopsis" class="section level2">
 <h2>Synopsis</h2>
-<p>In the following excercise, we analyze the severe weather events collected by NOAA to answer two questions: 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? 2. Across the United States, which types of events have the greatest economic consequences?</p>
+<p>In the following excercise, we analyze the severe weather events collected by NOAA to answer two questions: 1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health? 2. Across the United States, which types of events have the greatest economic consequences? We conclude that tonados and floods have most human health impact (injuries and fatalities) and economic impact, respectively.</p>
 </div>
 <div id="introduction" class="section level2">
 <h2>Introduction</h2>
@@ -78,7 +78,7 @@ img {
 <div id="data-processing" class="section level2">
 <h2>Data Processing</h2>
 <p>Firt, we read the data into a data frame (df):</p>
-<pre class="r"><code>df&lt;-read.csv(&quot;repdata-data-StormData.csv&quot;)
+<pre class="r"><code>df&lt;-read.csv(bzfile(&quot;repdata-data-StormData.csv.bz2&quot;))
 str(df)</code></pre>
 <pre><code>## 'data.frame':    902297 obs. of  37 variables:
 ##  $ STATE__   : num  1 1 1 1 1 1 1 1 1 1 ...
@@ -116,7 +116,7 @@ str(df)</code></pre>
 ##  $ LONGITUDE : num  8812 8755 8742 8626 8642 ...
 ##  $ LATITUDE_E: num  3051 0 0 0 0 ...
 ##  $ LONGITUDE_: num  8806 0 0 0 0 ...
-##  $ REMARKS   : Factor w/ 436774 levels &quot;&quot;,&quot;-2 at Deer Park\n&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
+##  $ REMARKS   : Factor w/ 436781 levels &quot;&quot;,&quot;-2 at Deer Park\n&quot;,..: 1 1 1 1 1 1 1 1 1 1 ...
 ##  $ REFNUM    : num  1 2 3 4 5 6 7 8 9 10 ...</code></pre>
 <p>To answer the questions raised above, we need to extract the following columns: “EVTYPE”, “FATALITIES”, “INJURIES”, “PROPDMG”, “PROPDMGEXP”, “CROPDMG”, and “CROPDMGEXP”. For the damages, it should be noted that, the numbers in CROPDMG/PROPDMG columns are given in different units (kilo, mil, billion), which are set in the corresponding CROPDMGEXP/PROPDMGEXP columns. As a result, we need to do some cleaning up and conversion. So we subset part of the data into df2:</p>
 <pre class="r"><code>s&lt;-c(&quot;EVTYPE&quot;,&quot;FATALITIES&quot;,&quot;INJURIES&quot;,
